@@ -1,105 +1,103 @@
-package ru.mirea.fund.model;
+package ru.mirea.fund.model; // Объявляем пакет класса.
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.math.BigDecimal; // Подключаем необходимый тип.
+import java.time.LocalDateTime; // Подключаем необходимый тип.
 
-/** Пожертвование — основная сущность системы. Связано с донором через donorId. */
-public class Donation {
+/** Пожертвование — основная сущность системы, строка таблицы donations. */
+public class Donation { // Модель пожертвования, связана с донором через donorId.
 
-    private int id;
-    private int donorId;
-    private String donorName;          // имя донора из связанной таблицы (для вывода и поиска)
-    private String purpose;            // назначение пожертвования
-    private DonationCategory category;
-    private DonationStatus status;
-    private BigDecimal amount;
-    private LocalDateTime createdAt;
+    private int id; // Первичный ключ, выдаёт база данных.
+    private int donorId; // Внешний ключ на таблицу donors.
+    private String donorName; // Имя донора из JOIN, нужно для вывода и поиска.
+    private String purpose; // Назначение: на что собираются деньги.
+    private DonationCategory category; // Направление помощи вместо «магической строки».
+    private DonationStatus status; // Стадия обработки пожертвования.
+    private BigDecimal amount; // Сумма деньгами: BigDecimal точнее double.
+    private LocalDateTime createdAt; // Дата и время создания записи.
 
-    /** Конструктор для новой записи: статус всегда NEW, дата — текущая. */
-    public Donation(int donorId, String purpose, DonationCategory category, BigDecimal amount) {
-        this(0, donorId, null, purpose, category, DonationStatus.NEW, amount, LocalDateTime.now());
-    }
+    public Donation(int donorId, String purpose, DonationCategory category, BigDecimal amount) { // Конструктор нового пожертвования: статус всегда NEW.
+        this(0, donorId, null, purpose, category, DonationStatus.NEW, amount, LocalDateTime.now()); // Вызываем полный конструктор.
+    } // Завершаем блок.
 
-    /** Полный конструктор — используется при чтении из базы данных. */
-    public Donation(int id, int donorId, String donorName, String purpose, DonationCategory category,
-                    DonationStatus status, BigDecimal amount, LocalDateTime createdAt) {
-        this.id = id;
-        this.donorId = donorId;
-        this.donorName = donorName;
-        this.purpose = purpose;
-        this.category = category;
-        this.status = status;
-        this.amount = amount;
-        this.createdAt = createdAt;
-    }
+    public Donation(int id, int donorId, String donorName, String purpose, DonationCategory category, // Полный конструктор: собирает объект из строки БД.
+                    DonationStatus status, BigDecimal amount, LocalDateTime createdAt) { // Перечисляем параметры.
+        this.id = id; // Сохраняем значение в поле.
+        this.donorId = donorId; // Сохраняем значение в поле.
+        this.donorName = donorName; // Сохраняем значение в поле.
+        this.purpose = purpose; // Сохраняем значение в поле.
+        this.category = category; // Сохраняем значение в поле.
+        this.status = status; // Сохраняем значение в поле.
+        this.amount = amount; // Сохраняем значение в поле.
+        this.createdAt = createdAt; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public int getId() {
-        return id;
-    }
+    public int getId() { // Возвращает идентификатор пожертвования.
+        return id; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public void setId(int id) {
-        this.id = id;
-    }
+    public void setId(int id) { // Задаёт идентификатор после сохранения в БД.
+        this.id = id; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public int getDonorId() {
-        return donorId;
-    }
+    public int getDonorId() { // Возвращает идентификатор донора.
+        return donorId; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public void setDonorId(int donorId) {
-        this.donorId = donorId;
-    }
+    public void setDonorId(int donorId) { // Задаёт донора пожертвования.
+        this.donorId = donorId; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public String getDonorName() {
-        return donorName;
-    }
+    public String getDonorName() { // Возвращает имя донора для вывода.
+        return donorName; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public void setDonorName(String donorName) {
-        this.donorName = donorName;
-    }
+    public void setDonorName(String donorName) { // Задаёт имя донора, полученное из JOIN.
+        this.donorName = donorName; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public String getPurpose() {
-        return purpose;
-    }
+    public String getPurpose() { // Возвращает назначение пожертвования.
+        return purpose; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public void setPurpose(String purpose) {
-        this.purpose = purpose;
-    }
+    public void setPurpose(String purpose) { // Задаёт новое назначение пожертвования.
+        this.purpose = purpose; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public DonationCategory getCategory() {
-        return category;
-    }
+    public DonationCategory getCategory() { // Возвращает направление помощи.
+        return category; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public void setCategory(DonationCategory category) {
-        this.category = category;
-    }
+    public void setCategory(DonationCategory category) { // Задаёт новое направление помощи.
+        this.category = category; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public DonationStatus getStatus() {
-        return status;
-    }
+    public DonationStatus getStatus() { // Возвращает текущий статус пожертвования.
+        return status; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public void setStatus(DonationStatus status) {
-        this.status = status;
-    }
+    public void setStatus(DonationStatus status) { // Задаёт новый статус пожертвования.
+        this.status = status; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public BigDecimal getAmount() {
-        return amount;
-    }
+    public BigDecimal getAmount() { // Возвращает сумму пожертвования.
+        return amount; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
+    public void setAmount(BigDecimal amount) { // Задаёт новую сумму пожертвования.
+        this.amount = amount; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+    public LocalDateTime getCreatedAt() { // Возвращает дату создания записи.
+        return createdAt; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
+    public void setCreatedAt(LocalDateTime createdAt) { // Задаёт дату создания записи.
+        this.createdAt = createdAt; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    @Override
-    public String toString() {
-        return String.format("#%d %s | %s | %s | %s руб. | %s | %s",
-                id, purpose, category.getTitle(), status.getTitle(), amount, donorName, createdAt.toLocalDate());
-    }
-}
+    @Override // Переопределяем метод.
+    public String toString() { // Собирает читаемую строку пожертвования для вывода.
+        return String.format("#%d %s | %s | %s | %s руб. | %s | %s", // Возвращаем результат.
+                id, purpose, category.getTitle(), status.getTitle(), amount, donorName, createdAt.toLocalDate()); // Подставляем значения полей.
+    } // Завершаем блок.
+} // Завершаем блок.

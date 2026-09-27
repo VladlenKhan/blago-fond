@@ -1,9 +1,9 @@
-package ru.mirea.fund.exception;
+package ru.mirea.fund.exception; // Объявляем пакет класса.
 
-/** Нарушение бизнес-правила фонда (некорректная сумма, запрещённый переход статуса и т.д.). */
-public class BusinessException extends RuntimeException {
+/** Собственное исключение: нарушено бизнес-правило фонда. */
+public class BusinessException extends RuntimeException { // Ошибка бизнес-правила: непроверяемое исключение.
 
-    public BusinessException(String message) {
-        super(message);
-    }
-}
+    public BusinessException(String message) { // Конструктор: принимает текст нарушенного правила.
+        super(message); // Вызываем конструктор суперкласса.
+    } // Завершаем блок.
+} // Завершаем блок.

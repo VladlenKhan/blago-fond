@@ -1,37 +1,38 @@
-package ru.mirea.fund.model;
+package ru.mirea.fund.model; // Объявляем пакет класса.
 
-import ru.mirea.fund.exception.BusinessException;
+import ru.mirea.fund.exception.BusinessException; // Подключаем необходимый тип.
 
 /** Направление благотворительной помощи. */
-public enum DonationCategory {
+public enum DonationCategory { // Перечисление направлений: закрытый список вместо строк.
 
-    MEDICINE("Лечение"),
-    EDUCATION("Образование"),
-    CHILDREN("Помощь детям"),
-    ANIMALS("Помощь животным"),
-    ECOLOGY("Экология");
+    MEDICINE("Лечение"), // Сбор на лечение и медицинскую помощь.
+    EDUCATION("Образование"), // Сбор на обучение, учебники и оборудование.
+    CHILDREN("Помощь детям"), // Помощь детям и детским учреждениям.
+    ANIMALS("Помощь животным"), // Помощь приютам и животным.
+    ECOLOGY("Экология"); // Экологические программы фонда.
 
-    private final String title;
+    private final String title; // Понятное название направления для вывода.
 
-    DonationCategory(String title) {
-        this.title = title;
-    }
+    DonationCategory(String title) { // Конструктор перечисления: задаёт название константе.
+        this.title = title; // Сохраняем значение в поле.
+    } // Завершаем блок.
 
-    public String getTitle() {
-        return title;
-    }
+    public String getTitle() { // Возвращает название направления.
+        return title; // Возвращаем результат.
+    } // Завершаем блок.
 
-    public static DonationCategory parse(String text) {
-        for (DonationCategory category : values()) {
-            if (category.name().equalsIgnoreCase(text.trim())) {
-                return category;
-            }
-        }
-        throw new BusinessException("Недопустимая категория: " + text);
-    }
+    /** Разбор направления из строки с понятной ошибкой. */
+    public static DonationCategory parse(String text) { // Превращает ввод пользователя в константу направления.
+        for (DonationCategory category : values()) { // Перебираем элементы.
+            if (category.name().equalsIgnoreCase(text.trim())) { // Проверяем условие.
+                return category; // Возвращаем результат.
+            } // Завершаем блок.
+        } // Завершаем блок.
+        throw new BusinessException("Недопустимая категория: " + text); // Выбрасываем исключение.
+    } // Завершаем блок.
 
-    @Override
-    public String toString() {
-        return name() + " (" + title + ")";
-    }
-}
+    @Override // Переопределяем метод.
+    public String toString() { // Показывает код и название: MEDICINE (Лечение).
+        return name() + " (" + title + ")"; // Возвращаем результат.
+    } // Завершаем блок.
+} // Завершаем блок.

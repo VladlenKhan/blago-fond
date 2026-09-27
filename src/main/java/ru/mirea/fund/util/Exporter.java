@@ -1,19 +1,14 @@
-package ru.mirea.fund.util;
+package ru.mirea.fund.util; // Объявляем пакет класса.
 
-import ru.mirea.fund.model.Donation;
-import ru.mirea.fund.model.Donor;
+import ru.mirea.fund.model.Donation; // Подключаем необходимый тип.
+import ru.mirea.fund.model.Donor; // Подключаем необходимый тип.
 
-import java.util.List;
+import java.util.List; // Подключаем необходимый тип.
 
-/**
- * Интерфейс экспорта данных фонда.
- * Реализации ExcelExporter и CsvExporter подставляются в меню через общий тип — это полиморфизм.
- */
-public interface Exporter {
+/** Интерфейс экспорта данных фонда: общий контракт для Excel и CSV. */
+public interface Exporter { // Контракт экспорта: меню не знает, в какой формат пишем.
 
-    /** Записывает доноров и пожертвования в файл и возвращает путь к созданному файлу. */
-    String export(List<Donor> donors, List<Donation> donations);
+    String export(List<Donor> donors, List<Donation> donations); // Пишет данные в файл и возвращает путь к нему.
 
-    /** Название формата для меню. */
-    String getFormatName();
-}
+    String getFormatName(); // Возвращает название формата для меню.
+} // Завершаем блок.
