@@ -1,81 +1,88 @@
-package ru.mirea.fund.model; // Объявляем пакет класса.
+package ru.mirea.fund.model; // Пакет доменной модели: классы-сущности фонда.
 
-import java.time.LocalDate; // Подключаем необходимый тип.
+import java.time.LocalDate; // Дата без времени: для даты регистрации часы не нужны.
 
-/** Донор (жертвователь) — участник предметной области, строка таблицы donors. */
-public class Donor { // Модель донора: хранит данные, не знает про БД и меню.
+// Донор (жертвователь) — одна строка таблицы donors.
+// Класс только хранит данные: он ничего не знает ни про SQL, ни про меню.
+// Все поля закрыты (private), снаружи доступ идёт через геттеры и сеттеры — это инкапсуляция.
+public class Donor {
 
-    private int id; // Первичный ключ, выдаёт база данных.
-    private String fullName; // ФИО донора.
-    private String email; // Email, уникален в таблице donors.
-    private String phone; // Контактный телефон.
-    private String city; // Город донора.
-    private LocalDate registeredAt; // Дата регистрации в фонде.
+    private int id; // Первичный ключ; у новой записи 0, реальное значение выдаёт база.
+    private String fullName; // ФИО донора, показывается в списках и в поиске.
+    private String email; // Email; в таблице на него стоит UNIQUE — двух одинаковых быть не может.
+    private String phone; // Контактный телефон для связи с донором.
+    private String city; // Город; по нему работает фильтрация доноров.
+    private LocalDate registeredAt; // Дата регистрации в фонде, задним числом не меняется.
 
-    public Donor(String fullName, String email, String phone, String city) { // Конструктор нового донора: id выдаст база.
-        this(0, fullName, email, phone, city, LocalDate.now()); // Вызываем полный конструктор.
-    } // Завершаем блок.
+    // Конструктор для НОВОГО донора, которого ещё нет в базе.
+    // id = 0 означает «ещё не сохранён», дата регистрации — сегодняшняя.
+    public Donor(String fullName, String email, String phone, String city) {
+        this(0, fullName, email, phone, city, LocalDate.now()); // this(...) вызывает полный конструктор, чтобы не дублировать присваивания.
+    }
 
-    public Donor(int id, String fullName, String email, String phone, String city, LocalDate registeredAt) { // Полный конструктор: собирает объект из строки БД.
-        this.id = id; // Сохраняем значение в поле.
-        this.fullName = fullName; // Сохраняем значение в поле.
-        this.email = email; // Сохраняем значение в поле.
-        this.phone = phone; // Сохраняем значение в поле.
-        this.city = city; // Сохраняем значение в поле.
-        this.registeredAt = registeredAt; // Сохраняем значение в поле.
-    } // Завершаем блок.
+    // Полный конструктор: им пользуется репозиторий, когда собирает объект из строки ResultSet.
+    public Donor(int id, String fullName, String email, String phone, String city, LocalDate registeredAt) {
+        this.id = id;
+        this.fullName = fullName;
+        this.email = email;
+        this.phone = phone;
+        this.city = city;
+        this.registeredAt = registeredAt;
+    }
 
-    public int getId() { // Возвращает идентификатор донора.
-        return id; // Возвращаем результат.
-    } // Завершаем блок.
+    public int getId() { // Отдаёт идентификатор: по нему сервисы ищут и обновляют донора.
+        return id;
+    }
 
-    public void setId(int id) { // Задаёт идентификатор после сохранения в БД.
-        this.id = id; // Сохраняем значение в поле.
-    } // Завершаем блок.
+    public void setId(int id) { // Проставляет id, который вернула база после INSERT.
+        this.id = id;
+    }
 
-    public String getFullName() { // Возвращает ФИО донора.
-        return fullName; // Возвращаем результат.
-    } // Завершаем блок.
+    public String getFullName() { // ФИО нужно меню для вывода и статистике для группировки.
+        return fullName;
+    }
 
-    public void setFullName(String fullName) { // Задаёт новое ФИО донора.
-        this.fullName = fullName; // Сохраняем значение в поле.
-    } // Завершаем блок.
+    public void setFullName(String fullName) { // Меняет ФИО; корректность проверяет сервис, а не сам класс.
+        this.fullName = fullName;
+    }
 
-    public String getEmail() { // Возвращает email донора.
-        return email; // Возвращаем результат.
-    } // Завершаем блок.
+    public String getEmail() { // Email используется при проверке уникальности перед сохранением.
+        return email;
+    }
 
-    public void setEmail(String email) { // Задаёт новый email донора.
-        this.email = email; // Сохраняем значение в поле.
-    } // Завершаем блок.
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
-    public String getPhone() { // Возвращает телефон донора.
-        return phone; // Возвращаем результат.
-    } // Завершаем блок.
+    public String getPhone() {
+        return phone;
+    }
 
-    public void setPhone(String phone) { // Задаёт новый телефон донора.
-        this.phone = phone; // Сохраняем значение в поле.
-    } // Завершаем блок.
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
 
-    public String getCity() { // Возвращает город донора.
-        return city; // Возвращаем результат.
-    } // Завершаем блок.
+    public String getCity() { // Город читает фильтр доноров по городу.
+        return city;
+    }
 
-    public void setCity(String city) { // Задаёт новый город донора.
-        this.city = city; // Сохраняем значение в поле.
-    } // Завершаем блок.
+    public void setCity(String city) {
+        this.city = city;
+    }
 
-    public LocalDate getRegisteredAt() { // Возвращает дату регистрации донора.
-        return registeredAt; // Возвращаем результат.
-    } // Завершаем блок.
+    public LocalDate getRegisteredAt() {
+        return registeredAt;
+    }
 
-    public void setRegisteredAt(LocalDate registeredAt) { // Задаёт дату регистрации донора.
-        this.registeredAt = registeredAt; // Сохраняем значение в поле.
-    } // Завершаем блок.
+    public void setRegisteredAt(LocalDate registeredAt) {
+        this.registeredAt = registeredAt;
+    }
 
-    @Override // Переопределяем метод.
-    public String toString() { // Собирает читаемую строку донора для вывода.
-        return String.format("#%d %s | %s | %s | %s | с %s", // Возвращаем результат.
-                id, fullName, email, phone, city, registeredAt); // Подставляем значения полей.
-    } // Завершаем блок.
-} // Завершаем блок.
+    // Переопределяем toString, чтобы донора можно было вывести через println(donor)
+    // и получить читаемую строку вместо адреса объекта вида Donor@1b6d3586.
+    @Override
+    public String toString() {
+        return String.format("#%d %s | %s | %s | %s | с %s",
+                id, fullName, email, phone, city, registeredAt);
+    }
+}

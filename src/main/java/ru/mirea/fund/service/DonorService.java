@@ -1,93 +1,110 @@
-package ru.mirea.fund.service; // Объявляем пакет класса.
+package ru.mirea.fund.service; // Пакет бизнес-логики: здесь проверяются все правила фонда.
 
-import ru.mirea.fund.exception.BusinessException; // Подключаем необходимый тип.
-import ru.mirea.fund.exception.EntityNotFoundException; // Подключаем необходимый тип.
-import ru.mirea.fund.model.Donor; // Подключаем необходимый тип.
-import ru.mirea.fund.repository.DonorRepository; // Подключаем необходимый тип.
+import ru.mirea.fund.exception.BusinessException; // Бросаем, когда пользователь нарушил правило фонда.
+import ru.mirea.fund.exception.EntityNotFoundException; // Бросаем, когда донора с таким id в базе нет.
+import ru.mirea.fund.model.Donor; // Класс-сущность, с объектами которого работает сервис.
+import ru.mirea.fund.repository.DonorRepository; // Слой доступа к данным: только через него идём в базу.
 
-import java.util.Comparator; // Подключаем необходимый тип.
-import java.util.List; // Подключаем необходимый тип.
-import java.util.stream.Collectors; // Подключаем необходимый тип.
+import java.util.Comparator; // Задаёт правило сравнения объектов для сортировки списка.
+import java.util.List; // Тип возвращаемого набора доноров.
+import java.util.stream.Collectors; // Собирает поток обратно в List после фильтрации или сортировки.
 
-/** Бизнес-логика работы с донорами: проверки правил и вызов репозитория. */
-public class DonorService { // Сервис доноров: проверяет правила и обращается к репозиторию.
+// Сервисный слой для доноров: проверки бизнес-правил плюс вызов репозитория.
+// Меню (ConsoleApp) обращается только сюда и не знает ни про SQL, ни про JDBC.
+// Сервис, наоборот, не знает, как выводить данные на экран.
+public class DonorService {
 
-    private final DonorRepository repository = new DonorRepository(); // Репозиторий доноров, через него идёт работа с БД.
+    private final DonorRepository repository = new DonorRepository(); // Репозиторий доноров: сервис пользуется им для всех обращений к базе.
 
-    /** Создание донора: ФИО, email и город обязательны, email уникален. */
-    public Donor create(String fullName, String email, String phone, String city) { // Создаёт донора после проверки правил.
-        validate(fullName, email, city); // Проверяем бизнес-правила.
+    // Создание донора.
+    // ПРАВИЛА: ФИО, email и город обязательны и корректны (проверяет validate),
+    // плюс email не должен повторяться.
+    public Donor create(String fullName, String email, String phone, String city) {
+        validate(fullName, email, city);
 
-        if (repository.existsByEmail(email, 0)) { // Проверяем условие.
-            throw new BusinessException("Донор с email " + email + " уже зарегистрирован"); // Выбрасываем исключение.
-        } // Завершаем блок.
+        // Проверяем уникальность до вставки, чтобы показать понятное сообщение.
+        // В самой базе на email стоит UNIQUE — это вторая линия защиты.
+        if (repository.existsByEmail(email, 0)) {
+            throw new BusinessException("Донор с email " + email + " уже зарегистрирован");
+        }
 
-        Donor donor = new Donor(fullName.trim(), email.trim(), phone, city.trim()); // Создаем переменную или объект.
-        repository.save(donor); // Сохраняем данные.
-        return donor; // Возвращаем результат.
-    } // Завершаем блок.
+        Donor donor = new Donor(fullName.trim(), email.trim(), phone, city.trim()); // trim() убирает случайные пробелы по краям ввода.
+        repository.save(donor); // После сохранения у объекта появится id, выданный базой.
+        return donor;
+    }
 
-    public List<Donor> findAll() { // Возвращает список всех доноров.
-        return repository.findAll(); // Возвращаем результат.
-    } // Завершаем блок.
+    // Отдаёт всех доноров: используется в списках меню и при создании пожертвования.
+    public List<Donor> findAll() {
+        return repository.findAll();
+    }
 
-    public Donor findById(int id) { // Находит донора или сообщает, что его нет.
-        return repository.findById(id) // Получаем данные из репозитория.
-                .orElseThrow(() -> new EntityNotFoundException("Донор", id)); // Выбрасываем исключение, если записи нет.
-    } // Завершаем блок.
+    // Поиск по id. Репозиторий возвращает Optional, а сервис превращает пустой Optional
+    // в исключение: наверху удобнее один раз поймать ошибку, чем каждый раз проверять «а есть ли значение».
+    public Donor findById(int id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Донор", id));
+    }
 
-    public void update(int id, String fullName, String email, String phone, String city) { // Изменяет данные донора после проверок.
-        Donor donor = findById(id); // Получаем данные из репозитория.
-        validate(fullName, email, city); // Проверяем бизнес-правила.
+    // Изменение данных донора с теми же проверками, что и при создании.
+    public void update(int id, String fullName, String email, String phone, String city) {
+        Donor donor = findById(id); // Заодно убеждаемся, что такой донор существует.
+        validate(fullName, email, city);
 
-        if (repository.existsByEmail(email, id)) { // Проверяем условие.
-            throw new BusinessException("Email " + email + " уже занят другим донором"); // Выбрасываем исключение.
-        } // Завершаем блок.
+        // Передаём id, чтобы собственный email донора не считался занятым.
+        if (repository.existsByEmail(email, id)) {
+            throw new BusinessException("Email " + email + " уже занят другим донором");
+        }
 
-        donor.setFullName(fullName.trim()); // Сохраняем значение в объекте.
-        donor.setEmail(email.trim()); // Сохраняем значение в объекте.
-        donor.setPhone(phone); // Сохраняем значение в объекте.
-        donor.setCity(city.trim()); // Сохраняем значение в объекте.
-        repository.update(donor); // Сохраняем данные.
-    } // Завершаем блок.
+        // Меняем поля у объекта, а потом одним запросом сохраняем всё сразу.
+        donor.setFullName(fullName.trim());
+        donor.setEmail(email.trim());
+        donor.setPhone(phone);
+        donor.setCity(city.trim());
+        repository.update(donor);
+    }
 
-    public void delete(int id) { // Удаляет донора, если он существует.
-        findById(id); // Проверяем существование записи.
-        repository.delete(id); // Удаляем элемент или запись.
-    } // Завершаем блок.
+    // Удаление донора вместе с его пожертвованиями (за каскад отвечает внешний ключ в базе).
+    public void delete(int id) {
+        findById(id); // Если донора нет — вылетит EntityNotFoundException и до удаления дело не дойдёт.
+        repository.delete(id);
+    }
 
-    /** Поиск донора по имени или email. */
-    public List<Donor> search(String text) { // Ищет доноров по имени или email.
-        if (text == null || text.trim().isEmpty()) { // Проверяем условие.
-            throw new BusinessException("Строка поиска не может быть пустой"); // Выбрасываем исключение.
-        } // Завершаем блок.
-        return repository.searchByText(text.trim()); // Возвращаем результат.
-    } // Завершаем блок.
+    // ПОИСК донора по имени или email; сам SQL-запрос лежит в репозитории.
+    public List<Donor> search(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            throw new BusinessException("Строка поиска не может быть пустой"); // Пустая строка в LIKE '%%' вернула бы вообще всех — это не поиск.
+        }
+        return repository.searchByText(text.trim());
+    }
 
-    /** Фильтрация доноров по городу. */
-    public List<Donor> filterByCity(String city) { // Отбирает доноров нужного города.
-        return repository.findAll().stream() // Создаем поток обработки данных.
-                .filter(donor -> donor.getCity().equalsIgnoreCase(city.trim())) // Фильтруем элементы.
-                .collect(Collectors.toList()); // Собираем результат в коллекцию.
-    } // Завершаем блок.
+    // ФИЛЬТР по городу сделан через Stream API, а не через SQL, чтобы показать работу с коллекциями:
+    // stream() превращает список в поток, filter() оставляет подходящие элементы,
+    // collect() собирает их обратно в список.
+    public List<Donor> filterByCity(String city) {
+        return repository.findAll().stream()
+                .filter(donor -> donor.getCity().equalsIgnoreCase(city.trim()))
+                .collect(Collectors.toList());
+    }
 
-    /** Сортировка доноров по алфавиту. */
-    public List<Donor> sortedByName() { // Возвращает доноров по алфавиту.
-        return repository.findAll().stream() // Создаем поток обработки данных.
-                .sorted(Comparator.comparing(Donor::getFullName)) // Сортируем элементы.
-                .collect(Collectors.toList()); // Собираем результат в коллекцию.
-    } // Завершаем блок.
+    // СОРТИРОВКА по алфавиту: Comparator.comparing указывает, по какому полю сравнивать объекты.
+    public List<Donor> sortedByName() {
+        return repository.findAll().stream()
+                .sorted(Comparator.comparing(Donor::getFullName))
+                .collect(Collectors.toList());
+    }
 
-    /** Проверка обязательных полей донора. */
-    private void validate(String fullName, String email, String city) { // Проверяет обязательные поля и формат email.
-        if (fullName == null || fullName.trim().length() < 3) { // Проверяем условие.
-            throw new BusinessException("ФИО донора обязательно и должно содержать минимум 3 символа"); // Выбрасываем исключение.
-        } // Завершаем блок.
-        if (email == null || !email.matches("[^@\\s]+@[^@\\s]+\\.[a-zA-Z]{2,}")) { // Проверяем условие.
-            throw new BusinessException("Некорректный email: " + email); // Выбрасываем исключение.
-        } // Завершаем блок.
-        if (city == null || city.trim().isEmpty()) { // Проверяем условие.
-            throw new BusinessException("Город обязателен для заполнения"); // Выбрасываем исключение.
-        } // Завершаем блок.
-    } // Завершаем блок.
-} // Завершаем блок.
+    // Общие проверки полей донора.
+    // Вынесены в отдельный приватный метод, потому что нужны и при создании, и при изменении.
+    private void validate(String fullName, String email, String city) {
+        if (fullName == null || fullName.trim().length() < 3) {
+            throw new BusinessException("ФИО донора обязательно и должно содержать минимум 3 символа");
+        }
+        // Простая проверка формата: что-то, собака, что-то, точка и минимум две буквы домена.
+        if (email == null || !email.matches("[^@\\s]+@[^@\\s]+\\.[a-zA-Z]{2,}")) {
+            throw new BusinessException("Некорректный email: " + email);
+        }
+        if (city == null || city.trim().isEmpty()) {
+            throw new BusinessException("Город обязателен для заполнения");
+        }
+    }
+}

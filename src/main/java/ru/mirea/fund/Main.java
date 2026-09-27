@@ -1,22 +1,27 @@
-package ru.mirea.fund; // Объявляем пакет класса.
+package ru.mirea.fund; // Корневой пакет проекта: здесь лежит только точка входа.
 
-import ru.mirea.fund.exception.DataAccessException; // Подключаем необходимый тип.
-import ru.mirea.fund.ui.ConsoleApp; // Подключаем необходимый тип.
-import ru.mirea.fund.util.DatabaseManager; // Подключаем необходимый тип.
+import ru.mirea.fund.exception.DataAccessException; // Ошибка базы: ловим её, чтобы дать понятную подсказку вместо стектрейса.
+import ru.mirea.fund.ui.ConsoleApp; // Консольное меню: ему передаётся управление после проверки базы.
+import ru.mirea.fund.util.DatabaseManager; // Подключение к базе и создание таблиц при первом запуске.
 
-/** Точка входа: проверяет базу данных и запускает консольное меню. */
-public class Main { // Точка входа: только запуск, вся логика в других классах.
+// Точка входа в программу.
+// Здесь намеренно почти нет кода: Main только запускает приложение, а вся логика
+// лежит в отдельных классах — так требует задание, запрещающее писать всё в Main.
+public class Main {
 
-    public static void main(String[] args) { // Точка входа в программу.
-        try { // Открываем блок обработки ошибок.
-            DatabaseManager.checkConnection(); // Проверяем подключение к базе данных.
-            DatabaseManager.initSchemaIfNeeded(); // Создаем таблицы при первом запуске.
-        } catch (DataAccessException e) { // Обрабатываем исключение.
-            System.out.println("Ошибка: " + e.getMessage()); // Выводим результат в консоль.
-            System.out.println("Проверьте, что PostgreSQL запущен и настройки в db.properties корректны."); // Выводим результат в консоль.
-            return; // Завершаем выполнение метода.
-        } // Завершаем блок.
+    public static void main(String[] args) {
+        // Сначала убеждаемся, что база доступна: если упадём здесь, показывать меню
+        // бессмысленно — всё равно ни одна операция не сработает.
+        try {
+            DatabaseManager.checkConnection();
+            DatabaseManager.initSchemaIfNeeded(); // При первом запуске создаст таблицы и зальёт тестовые данные.
+        } catch (DataAccessException e) {
+            // Ловим только свою ошибку БД, чтобы показать человеку понятную подсказку.
+            System.out.println("Ошибка: " + e.getMessage());
+            System.out.println("Проверьте, что PostgreSQL запущен и настройки в db.properties корректны.");
+            return; // Выходим из программы, меню не запускаем.
+        }
 
-        new ConsoleApp().run(); // Запускаем консольное меню.
-    } // Завершаем блок.
-} // Завершаем блок.
+        new ConsoleApp().run(); // База в порядке — отдаём управление консольному меню.
+    }
+}

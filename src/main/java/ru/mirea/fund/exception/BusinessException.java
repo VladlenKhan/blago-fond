@@ -1,9 +1,13 @@
-package ru.mirea.fund.exception; // Объявляем пакет класса.
+package ru.mirea.fund.exception; // Пакет собственных исключений системы.
 
-/** Собственное исключение: нарушено бизнес-правило фонда. */
-public class BusinessException extends RuntimeException { // Ошибка бизнес-правила: непроверяемое исключение.
+// Нарушено бизнес-правило фонда: отрицательная сумма, пустое назначение,
+// занятый email, запрещённый переход статуса и тому подобное.
+// Наследуемся от RuntimeException (непроверяемое исключение), чтобы не писать throws
+// в каждом методе сервиса: все такие ошибки ловятся в одном месте — в меню ConsoleApp,
+// где пользователь видит понятный текст, а программа продолжает работу.
+public class BusinessException extends RuntimeException {
 
-    public BusinessException(String message) { // Конструктор: принимает текст нарушенного правила.
-        super(message); // Вызываем конструктор суперкласса.
-    } // Завершаем блок.
-} // Завершаем блок.
+    public BusinessException(String message) { // Принимает готовый текст нарушенного правила.
+        super(message); // Передаём сообщение в RuntimeException, оттуда его достанет getMessage().
+    }
+}

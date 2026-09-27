@@ -1,175 +1,203 @@
-package ru.mirea.fund.service; // Объявляем пакет класса.
+package ru.mirea.fund.service; // Пакет бизнес-логики: здесь проверяются все правила фонда.
 
-import ru.mirea.fund.exception.BusinessException; // Подключаем необходимый тип.
-import ru.mirea.fund.exception.EntityNotFoundException; // Подключаем необходимый тип.
-import ru.mirea.fund.model.Donation; // Подключаем необходимый тип.
-import ru.mirea.fund.model.DonationCategory; // Подключаем необходимый тип.
-import ru.mirea.fund.model.DonationStatus; // Подключаем необходимый тип.
-import ru.mirea.fund.repository.DonationRepository; // Подключаем необходимый тип.
+import ru.mirea.fund.exception.BusinessException; // Бросаем, когда пользователь нарушил правило фонда.
+import ru.mirea.fund.exception.EntityNotFoundException; // Бросаем, когда пожертвования с таким id в базе нет.
+import ru.mirea.fund.model.Donation; // Класс-сущность, с объектами которого работает сервис.
+import ru.mirea.fund.model.DonationCategory; // Enum направления помощи: ограничивает допустимые значения.
+import ru.mirea.fund.model.DonationStatus; // Enum статуса: он же хранит правила переходов между стадиями.
+import ru.mirea.fund.repository.DonationRepository; // Слой доступа к данным: только через него идём в базу.
 
-import java.math.BigDecimal; // Подключаем необходимый тип.
-import java.time.LocalDate; // Подключаем необходимый тип.
-import java.util.Comparator; // Подключаем необходимый тип.
-import java.util.List; // Подключаем необходимый тип.
-import java.util.stream.Collectors; // Подключаем необходимый тип.
+import java.math.BigDecimal; // Точный тип для денег: сравнивается через compareTo, а не через > и <.
+import java.time.LocalDate; // Дата без времени: её вводит пользователь при поиске за период.
+import java.util.Comparator; // Задаёт правило сравнения объектов для сортировки списка.
+import java.util.List; // Тип возвращаемого набора пожертвований.
+import java.util.stream.Collectors; // Собирает поток обратно в List после фильтрации или сортировки.
 
-/**
- * Бизнес-логика пожертвований.
- * Правила: назначение обязательно; сумма от 0 до 1 000 000; донор существует;
- * переходы NEW -> CONFIRMED -> COMPLETED; завершённое нельзя менять и удалять.
- */
-public class DonationService { // Главный сервис: вся бизнес-логика пожертвований.
+// Главный сервис системы — вся бизнес-логика пожертвований.
+//
+// БИЗНЕС-ПРАВИЛА, реализованные в этом классе:
+// 1. Назначение обязательно, минимум 3 символа.
+// 2. Сумма строго больше нуля и не превышает 1 000 000 руб.
+// 3. Донор должен существовать в базе.
+// 4. Разрешены только переходы NEW -> CONFIRMED -> COMPLETED (отмена — до завершения).
+// 5. Завершённое пожертвование нельзя изменить или удалить.
+//
+// Важно: правила проверяются здесь, в коде, а не в меню. Если завтра появится
+// веб-интерфейс вместо консоли — правила продолжат работать без изменений.
+public class DonationService {
 
-    private static final BigDecimal MAX_AMOUNT = new BigDecimal("1000000"); // Потолок одной суммы, чтобы число не терялось в коде.
+    private static final BigDecimal MAX_AMOUNT = new BigDecimal("1000000"); // Потолок одного пожертвования вынесен в константу, чтобы число не терялось в середине кода.
 
-    private final DonationRepository repository = new DonationRepository(); // Репозиторий пожертвований для работы с БД.
-    private final DonorService donorService = new DonorService(); // Сервис доноров: переиспользуем проверку существования.
+    private final DonationRepository repository = new DonationRepository(); // Репозиторий пожертвований: через него идут все обращения к базе.
+    private final DonorService donorService = new DonorService(); // Сервис доноров: переиспользуем его проверку существования донора, а не пишем её заново.
 
-    public Donation create(int donorId, String purpose, DonationCategory category, BigDecimal amount) { // Создаёт пожертвование после всех проверок.
-        donorService.findById(donorId); // Проверяем существование донора.
-        validate(purpose, amount); // Проверяем бизнес-правила.
+    // Создание пожертвования: проверяем донора, назначение и сумму.
+    public Donation create(int donorId, String purpose, DonationCategory category, BigDecimal amount) {
+        donorService.findById(donorId); // ПРАВИЛО 3: если донора нет, findById сам кинет EntityNotFoundException.
+        validate(purpose, amount); // ПРАВИЛА 1 и 2: назначение и сумма.
 
-        Donation donation = new Donation(donorId, purpose.trim(), category, amount); // Создаем переменную или объект.
-        repository.save(donation); // Сохраняем данные.
-        return findById(donation.getId()); // Возвращаем результат.
-    } // Завершаем блок.
+        Donation donation = new Donation(donorId, purpose.trim(), category, amount);
+        repository.save(donation);
 
-    public List<Donation> findAll() { // Возвращает список всех пожертвований.
-        return repository.findAll(); // Возвращаем результат.
-    } // Завершаем блок.
+        // Перечитываем запись из базы: в объекте после save нет имени донора (donorName),
+        // а оно нужно, чтобы сразу показать пользователю созданное пожертвование.
+        return findById(donation.getId());
+    }
 
-    public Donation findById(int id) { // Находит пожертвование или сообщает, что его нет.
-        return repository.findById(id) // Получаем данные из репозитория.
-                .orElseThrow(() -> new EntityNotFoundException("Пожертвование", id)); // Выбрасываем исключение, если записи нет.
-    } // Завершаем блок.
+    // Отдаёт все пожертвования: используется списком, фильтрами и статистикой.
+    public List<Donation> findAll() {
+        return repository.findAll();
+    }
 
-    public void update(int id, String purpose, DonationCategory category, BigDecimal amount) { // Изменяет пожертвование, если оно не завершено.
-        Donation donation = findById(id); // Получаем данные из репозитория.
+    // Поиск по id: пустой Optional из репозитория превращаем в понятную ошибку.
+    public Donation findById(int id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Пожертвование", id));
+    }
 
-        if (donation.getStatus() == DonationStatus.COMPLETED) { // Проверяем условие.
-            throw new BusinessException("Завершённое пожертвование нельзя изменить"); // Выбрасываем исключение.
-        } // Завершаем блок.
+    // Изменение пожертвования: назначение, направление и сумма.
+    public void update(int id, String purpose, DonationCategory category, BigDecimal amount) {
+        Donation donation = findById(id);
 
-        validate(purpose, amount); // Проверяем бизнес-правила.
-        donation.setPurpose(purpose.trim()); // Сохраняем значение в объекте.
-        donation.setCategory(category); // Сохраняем значение в объекте.
-        donation.setAmount(amount); // Сохраняем значение в объекте.
-        repository.update(donation); // Сохраняем данные.
-    } // Завершаем блок.
+        // ПРАВИЛО 5: завершённые записи входят в отчётность фонда, их трогать нельзя.
+        if (donation.getStatus() == DonationStatus.COMPLETED) {
+            throw new BusinessException("Завершённое пожертвование нельзя изменить");
+        }
 
-    /** Смена статуса с проверкой допустимого перехода. */
-    public void changeStatus(int id, DonationStatus newStatus) { // Меняет статус, если переход разрешён enum'ом.
-        Donation donation = findById(id); // Получаем данные из репозитория.
+        validate(purpose, amount);
+        donation.setPurpose(purpose.trim());
+        donation.setCategory(category);
+        donation.setAmount(amount);
+        repository.update(donation);
+    }
 
-        if (!donation.getStatus().canChangeTo(newStatus)) { // Проверяем условие.
-            throw new BusinessException("Недопустимый переход статуса: " // Выбрасываем исключение.
-                    + donation.getStatus().getTitle() + " -> " + newStatus.getTitle()); // Формируем текст ошибки.
-        } // Завершаем блок.
+    // ПРАВИЛО 4: смена статуса.
+    // Сам список разрешённых переходов лежит в enum DonationStatus — сервис только
+    // спрашивает «можно ли?» и формирует понятное сообщение об ошибке.
+    public void changeStatus(int id, DonationStatus newStatus) {
+        Donation donation = findById(id);
 
-        donation.setStatus(newStatus); // Сохраняем значение в объекте.
-        repository.update(donation); // Сохраняем данные.
-    } // Завершаем блок.
+        if (!donation.getStatus().canChangeTo(newStatus)) {
+            throw new BusinessException("Недопустимый переход статуса: "
+                    + donation.getStatus().getTitle() + " -> " + newStatus.getTitle());
+        }
 
-    public void delete(int id) { // Удаляет пожертвование, кроме завершённого.
-        Donation donation = findById(id); // Получаем данные из репозитория.
+        donation.setStatus(newStatus);
+        repository.update(donation);
+    }
 
-        if (donation.getStatus() == DonationStatus.COMPLETED) { // Проверяем условие.
-            throw new BusinessException("Завершённое пожертвование нельзя удалить — оно входит в отчётность фонда"); // Выбрасываем исключение.
-        } // Завершаем блок.
+    // Удаление пожертвования с той же защитой завершённых записей (ПРАВИЛО 5).
+    public void delete(int id) {
+        Donation donation = findById(id);
 
-        repository.delete(id); // Удаляем элемент или запись.
-    } // Завершаем блок.
+        if (donation.getStatus() == DonationStatus.COMPLETED) {
+            throw new BusinessException("Завершённое пожертвование нельзя удалить — оно входит в отчётность фонда");
+        }
 
-    /** Поиск по назначению пожертвования. */
-    public List<Donation> searchByPurpose(String text) { // Ищет пожертвования по назначению.
-        requireText(text); // Проверяем строку поиска.
-        return repository.searchByPurpose(text.trim()); // Возвращаем результат.
-    } // Завершаем блок.
+        repository.delete(id);
+    }
 
-    /** Поиск по имени донора. */
-    public List<Donation> searchByDonorName(String text) { // Ищет пожертвования по имени донора.
-        requireText(text); // Проверяем строку поиска.
-        return repository.searchByDonorName(text.trim()); // Возвращаем результат.
-    } // Завершаем блок.
+    // ---------- ПОИСК: выполняется базой данных через SQL и PreparedStatement ----------
+    // Поиск отдан базе, потому что она ищет по тексту быстрее и не тянет все строки в память программы.
 
-    /** Поиск за период. */
-    public List<Donation> searchByDateRange(LocalDate from, LocalDate to) { // Ищет пожертвования за указанный период.
-        if (from.isAfter(to)) { // Проверяем условие.
-            throw new BusinessException("Дата начала не может быть позже даты окончания"); // Выбрасываем исключение.
-        } // Завершаем блок.
-        return repository.searchByDateRange(from, to); // Возвращаем результат.
-    } // Завершаем блок.
+    // Поиск по части назначения пожертвования.
+    public List<Donation> searchByPurpose(String text) {
+        requireText(text);
+        return repository.searchByPurpose(text.trim());
+    }
 
-    /** Фильтрация по статусу. */
-    public List<Donation> filterByStatus(DonationStatus status) { // Отбирает пожертвования с нужным статусом.
-        return repository.findAll().stream() // Создаем поток обработки данных.
-                .filter(donation -> donation.getStatus() == status) // Фильтруем элементы.
-                .collect(Collectors.toList()); // Собираем результат в коллекцию.
-    } // Завершаем блок.
+    // Поиск по имени донора — работает за счёт JOIN в репозитории.
+    public List<Donation> searchByDonorName(String text) {
+        requireText(text);
+        return repository.searchByDonorName(text.trim());
+    }
 
-    /** Фильтрация по направлению помощи. */
-    public List<Donation> filterByCategory(DonationCategory category) { // Отбирает пожертвования нужного направления.
-        return repository.findAll().stream() // Создаем поток обработки данных.
-                .filter(donation -> donation.getCategory() == category) // Фильтруем элементы.
-                .collect(Collectors.toList()); // Собираем результат в коллекцию.
-    } // Завершаем блок.
+    // Поиск пожертвований за период между двумя датами.
+    public List<Donation> searchByDateRange(LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw new BusinessException("Дата начала не может быть позже даты окончания"); // Проверка здравого смысла: «с 2025 по 2024» — ошибка пользователя.
+        }
+        return repository.searchByDateRange(from, to);
+    }
 
-    /** Фильтрация по диапазону сумм. */
-    public List<Donation> filterByAmountRange(BigDecimal from, BigDecimal to) { // Отбирает пожертвования в диапазоне сумм.
-        if (from.compareTo(to) > 0) { // Проверяем условие.
-            throw new BusinessException("Минимальная сумма не может быть больше максимальной"); // Выбрасываем исключение.
-        } // Завершаем блок.
-        return repository.findAll().stream() // Создаем поток обработки данных.
-                .filter(donation -> donation.getAmount().compareTo(from) >= 0 // Фильтруем элементы.
-                        && donation.getAmount().compareTo(to) <= 0) // Проверяем верхнюю границу.
-                .collect(Collectors.toList()); // Собираем результат в коллекцию.
-    } // Завершаем блок.
+    // ---------- ФИЛЬТРАЦИЯ: выполняется в Java через Stream API ----------
+    // Здесь наоборот: берём список из базы и отбираем нужное в памяти,
+    // чтобы показать работу с коллекциями и Stream API, как требует задание.
 
-    /** Фильтрация по донору. */
-    public List<Donation> filterByDonor(int donorId) { // Отбирает пожертвования конкретного донора.
-        donorService.findById(donorId); // Проверяем существование донора.
-        return repository.findByDonorId(donorId); // Возвращаем результат.
-    } // Завершаем блок.
+    // Фильтр 1: по статусу. filter оставляет только подходящие элементы потока.
+    public List<Donation> filterByStatus(DonationStatus status) {
+        return repository.findAll().stream()
+                .filter(donation -> donation.getStatus() == status) // Константы enum сравниваем через ==, это один и тот же объект.
+                .collect(Collectors.toList());
+    }
 
-    /** Сортировка по сумме. */
-    public List<Donation> sortedByAmount(boolean descending) { // Сортирует по сумме: параметр задаёт направление.
-        Comparator<Donation> byAmount = Comparator.comparing(Donation::getAmount); // Создаем переменную или объект.
-        return repository.findAll().stream() // Создаем поток обработки данных.
-                .sorted(descending ? byAmount.reversed() : byAmount) // Сортируем элементы.
-                .collect(Collectors.toList()); // Собираем результат в коллекцию.
-    } // Завершаем блок.
+    // Фильтр 2: по направлению помощи.
+    public List<Donation> filterByCategory(DonationCategory category) {
+        return repository.findAll().stream()
+                .filter(donation -> donation.getCategory() == category)
+                .collect(Collectors.toList());
+    }
 
-    /** Сортировка по дате. */
-    public List<Donation> sortedByDate() { // Сортирует пожертвования от старых к новым.
-        return repository.findAll().stream() // Создаем поток обработки данных.
-                .sorted(Comparator.comparing(Donation::getCreatedAt)) // Сортируем элементы.
-                .collect(Collectors.toList()); // Собираем результат в коллекцию.
-    } // Завершаем блок.
+    // Фильтр 3: по диапазону сумм.
+    public List<Donation> filterByAmountRange(BigDecimal from, BigDecimal to) {
+        if (from.compareTo(to) > 0) {
+            throw new BusinessException("Минимальная сумма не может быть больше максимальной");
+        }
+        return repository.findAll().stream()
+                // BigDecimal — объект, а не примитив, поэтому сравниваем через compareTo:
+                // результат >= 0 значит «больше либо равно», <= 0 — «меньше либо равно».
+                .filter(donation -> donation.getAmount().compareTo(from) >= 0
+                        && donation.getAmount().compareTo(to) <= 0)
+                .collect(Collectors.toList());
+    }
 
-    /** Сортировка по имени донора и сумме. */
-    public List<Donation> sortedByDonorName() { // Сортирует по имени донора, затем по сумме.
-        return repository.findAll().stream() // Создаем поток обработки данных.
-                .sorted(Comparator.comparing(Donation::getDonorName).thenComparing(Donation::getAmount)) // Сортируем элементы.
-                .collect(Collectors.toList()); // Собираем результат в коллекцию.
-    } // Завершаем блок.
+    // Фильтр 4: по донору — тут выгоднее сразу спросить базу с условием WHERE, чем тянуть всё в память.
+    public List<Donation> filterByDonor(int donorId) {
+        donorService.findById(donorId); // Сначала убеждаемся, что такой донор существует.
+        return repository.findByDonorId(donorId);
+    }
 
-    /** Проверка назначения и суммы пожертвования. */
-    private void validate(String purpose, BigDecimal amount) { // Проверяет назначение и допустимую сумму.
-        if (purpose == null || purpose.trim().length() < 3) { // Проверяем условие.
-            throw new BusinessException("Назначение пожертвования обязательно (минимум 3 символа)"); // Выбрасываем исключение.
-        } // Завершаем блок.
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) { // Проверяем условие.
-            throw new BusinessException("Сумма пожертвования должна быть больше нуля"); // Выбрасываем исключение.
-        } // Завершаем блок.
-        if (amount.compareTo(MAX_AMOUNT) > 0) { // Проверяем условие.
-            throw new BusinessException("Сумма одного пожертвования не может превышать " + MAX_AMOUNT + " руб."); // Выбрасываем исключение.
-        } // Завершаем блок.
-    } // Завершаем блок.
+    // ---------- СОРТИРОВКА через Comparator ----------
 
-    /** Проверка непустой строки поиска. */
-    private void requireText(String text) { // Не даёт искать по пустой строке.
-        if (text == null || text.trim().isEmpty()) { // Проверяем условие.
-            throw new BusinessException("Строка поиска не может быть пустой"); // Выбрасываем исключение.
-        } // Завершаем блок.
-    } // Завершаем блок.
-} // Завершаем блок.
+    // Сортировка 1: по сумме. Параметр descending = true ставит крупные пожертвования первыми.
+    public List<Donation> sortedByAmount(boolean descending) {
+        Comparator<Donation> byAmount = Comparator.comparing(Donation::getAmount);
+        return repository.findAll().stream()
+                .sorted(descending ? byAmount.reversed() : byAmount) // reversed() переворачивает порядок сравнения на обратный.
+                .collect(Collectors.toList());
+    }
+
+    // Сортировка 2: по дате, от старых записей к новым.
+    public List<Donation> sortedByDate() {
+        return repository.findAll().stream()
+                .sorted(Comparator.comparing(Donation::getCreatedAt))
+                .collect(Collectors.toList());
+    }
+
+    // Сортировка 3: по имени донора, а внутри одного донора — по сумме (за это отвечает thenComparing).
+    public List<Donation> sortedByDonorName() {
+        return repository.findAll().stream()
+                .sorted(Comparator.comparing(Donation::getDonorName).thenComparing(Donation::getAmount))
+                .collect(Collectors.toList());
+    }
+
+    // Проверка полей пожертвования: используется и при создании, и при изменении.
+    private void validate(String purpose, BigDecimal amount) {
+        if (purpose == null || purpose.trim().length() < 3) {
+            throw new BusinessException("Назначение пожертвования обязательно (минимум 3 символа)");
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) { // compareTo(ZERO) <= 0 означает «меньше либо равно нулю».
+            throw new BusinessException("Сумма пожертвования должна быть больше нуля");
+        }
+        if (amount.compareTo(MAX_AMOUNT) > 0) {
+            throw new BusinessException("Сумма одного пожертвования не может превышать " + MAX_AMOUNT + " руб.");
+        }
+    }
+
+    // Не даёт искать по пустой строке: иначе LIKE '%%' вернул бы все записи подряд.
+    private void requireText(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            throw new BusinessException("Строка поиска не может быть пустой");
+        }
+    }
+}

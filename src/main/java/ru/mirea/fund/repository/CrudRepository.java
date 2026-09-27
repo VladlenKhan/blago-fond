@@ -1,18 +1,24 @@
-package ru.mirea.fund.repository; // Объявляем пакет класса.
+package ru.mirea.fund.repository; // Пакет слоя доступа к данным: здесь живёт весь SQL.
 
-import java.util.List; // Подключаем необходимый тип.
-import java.util.Optional; // Подключаем необходимый тип.
+import java.util.List; // Список: репозиторий возвращает набор записей таблицы.
+import java.util.Optional; // Контейнер «значение есть или его нет»: безопаснее, чем возвращать null.
 
-/** Общий интерфейс репозитория: базовые операции CRUD для любой сущности. */
-public interface CrudRepository<T> { // Контракт репозитория: один набор операций для всех сущностей.
+// Общий интерфейс репозитория — набор из пяти базовых операций CRUD
+// (Create, Read, Update, Delete).
+// Интерфейс обобщённый: <T> — тип сущности. DonorRepository реализует CrudRepository<Donor>,
+// DonationRepository — CrudRepository<Donation>. Получается один «договор» для обоих,
+// и с ними можно работать через общий тип — это полиморфизм.
+public interface CrudRepository<T> {
 
-    int save(T entity); // Сохраняет новую запись и возвращает её id.
+    int save(T entity); // Вставляет новую запись и возвращает id, который присвоила база.
 
-    List<T> findAll(); // Возвращает все записи таблицы.
+    List<T> findAll(); // Читает все записи таблицы для вывода, фильтров и статистики.
 
-    Optional<T> findById(int id); // Ищет запись по id, Optional вместо null.
+    // Ищет запись по id. Возвращаем Optional, а не null: вызывающий код обязан явно
+    // обработать случай «не нашли», и случайного NullPointerException не будет.
+    Optional<T> findById(int id);
 
-    void update(T entity); // Обновляет существующую запись.
+    void update(T entity); // Сохраняет изменения объекта в уже существующую строку таблицы.
 
-    void delete(int id); // Удаляет запись по id.
-} // Завершаем блок.
+    void delete(int id); // Удаляет строку по первичному ключу.
+}

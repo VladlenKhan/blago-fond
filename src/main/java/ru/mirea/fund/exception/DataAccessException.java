@@ -1,9 +1,15 @@
-package ru.mirea.fund.exception; // Объявляем пакет класса.
+package ru.mirea.fund.exception; // Пакет собственных исключений системы.
 
-/** Собственное исключение: ошибка подключения к БД или выполнения SQL-запроса. */
-public class DataAccessException extends RuntimeException { // Ошибка БД: обёртка над SQLException.
+// Ошибка базы данных: не удалось подключиться, не выполнился SQL-запрос и т.п.
+// Зачем своё исключение, если есть SQLException: SQLException — проверяемое,
+// его пришлось бы тащить через все слои (repository -> service -> ui) в сигнатурах методов.
+// Вместо этого репозиторий ловит SQLException и заворачивает его сюда,
+// и верхние слои про JDBC уже ничего не знают.
+public class DataAccessException extends RuntimeException {
 
-    public DataAccessException(String message, Throwable cause) { // Конструктор: хранит описание и исходную причину.
-        super(message + ": " + cause.getMessage(), cause); // Вызываем конструктор суперкласса.
-    } // Завершаем блок.
-} // Завершаем блок.
+    // message — что именно пытались сделать («Не удалось добавить донора»),
+    // cause — исходное SQLException: сохраняем его, чтобы не потерять настоящую причину сбоя.
+    public DataAccessException(String message, Throwable cause) {
+        super(message + ": " + cause.getMessage(), cause);
+    }
+}
